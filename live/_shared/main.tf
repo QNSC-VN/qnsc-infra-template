@@ -53,17 +53,33 @@ module "ecr" {
   tags              = { Scope = "shared" }
 }
 
-# ── GitHub OIDC deploy roles for the API/worker (ECS + ECR) ───────────────────
-# NOTE: iam-oidc is migrated to qnsc-tf-modules in Phase 3. Until then, copy the
-# iam-oidc module from rally-infra/opshub-infra into ./modules/ and use a local
-# source. After migration switch to:
-#   source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v1.0.0"
+# ── GitHub OIDC deploy roles (deploy per-env, ecr-push, infra plan/apply) ─────
 module "iam_oidc" {
   source            = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v1.0.0"
+  product           = "__PRODUCT__"
   github_org        = var.github_org
   oidc_provider_arn = data.terraform_remote_state.platform.outputs.oidc_provider_arn
-  ecr_arns          = ["*"]
-  tags              = { Scope = "shared" }
+
+  environments = {
+    develop = {
+      allowed_subjects = [
+        "repo:${var.github_org}/__PRODUCT__-api:ref:refs/heads/main",
+        "repo:${var.github_org}/__PRODUCT__-api:environment:develop",
+      ]
+    }
+    production = {
+      allowed_subjects = [
+        "repo:${var.github_org}/__PRODUCT__-api:ref:refs/heads/main",
+        "repo:${var.github_org}/__PRODUCT__-api:ref:refs/tags/v*",
+      ]
+    }
+  }
+
+  app_repo_names         = ["__PRODUCT__-api"]
+  infra_repo_name        = "__PRODUCT__-infra"
+  ecr_repository_pattern = "__PRODUCT__-*"
+  ecs_passrole_pattern   = "__PRODUCT__-*"
+  tags                   = { Scope = "shared" }
 }
 
 # ── GitHub OIDC deploy roles for the web SPA (S3 + CloudFront) ─────────────────

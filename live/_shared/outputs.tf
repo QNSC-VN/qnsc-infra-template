@@ -3,9 +3,14 @@ output "ecr_repository_urls" {
   description = "Map of ECR repo name → URL."
 }
 
-output "deploy_role_arn" {
-  value       = module.iam_oidc.deploy_role_arn
-  description = "OIDC role assumed by CI to deploy the API/worker."
+output "deploy_role_arns" {
+  value       = module.iam_oidc.deploy_role_arns
+  description = "Per-env OIDC roles assumed by CI to deploy the API/worker."
+}
+
+output "infra_apply_role_arn" {
+  value       = module.iam_oidc.infra_apply_role_arn
+  description = "OIDC role assumed by the infra apply pipeline."
 }
 
 output "web_deploy_role_arns" {
