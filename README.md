@@ -84,7 +84,7 @@ Then **compose the modules this product needs** in `live/develop` and
 ## Conventions baked in
 
 - State key: `<product>/<env>/terraform.tfstate` in `qnsc-tofu-state`.
-- OIDC-only auth (no static AWS keys) via `qnsc-gitops/actions/setup-tofu-aws@v1`.
+- OIDC-only auth (no static AWS keys) via `qnsc-ci/actions/setup-tofu-aws@v1`.
 - Modules referenced by pinned tag: `?ref=<module>-vX.Y.Z`.
 - Apply order `_shared → develop → prod`; prod requires manual approval.
 
