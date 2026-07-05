@@ -55,21 +55,29 @@ After init you have:
 ```
 live/
   _shared/   ECR repos + GitHub OIDC deploy roles (api/worker + web). Run once.
-  develop/   Develop environment stack (starter: network module wired).
-  prod/      Production stack (HA NAT, prod-sized).
+  develop/   Develop environment stack (starter: attaches to qnsc-infra's
+             shared platform-dev VPC/RDS/cache — does NOT provision its own
+             network. See live/develop/main.tf for the remote-state wiring).
+  prod/      Production stack (own VPC, HA NAT, prod-sized — fully isolated
+             per product, unlike develop).
 .github/workflows/
   plan.yml   tofu plan on PRs (per changed env), posts comment.
   apply.yml  tofu apply on merge: _shared → develop → prod (prod gated).
 ```
 
 Then **compose the modules this product needs** in `live/develop` and
-`live/prod`. See `rally-infra` / `opshub-infra` for full worked examples.
+`live/prod`. See `rally-infra` / `opshub-infra` for full worked examples
+(note: as of this template update, rally/opshub still provision their own
+develop-tier network — they predate the platform-dev migration. Use this
+template's `live/develop/main.tf` as the source of truth for the intended
+shape, not those repos, until they're migrated).
 
 ---
 
 ## Prerequisites for a new product
 
-1. **`qnsc-infra` bootstrap applied** — the platform singletons must exist first.
+1. **`qnsc-infra` bootstrap AND `platform-dev` applied** — the platform
+   singletons and the shared develop-tier VPC/RDS/cache must exist first.
 2. **GitHub secrets** on the new repo: `AWS_ACCOUNT_ID`,
    `ACM_CERT_ARN_DEVELOP`, `WEB_ACM_CERT_ARN_DEVELOP`, `ACM_CERT_ARN_PROD`,
    `WEB_ACM_CERT_ARN_PROD`.

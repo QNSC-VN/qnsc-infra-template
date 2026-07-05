@@ -45,7 +45,7 @@ locals {
 
 # ── Networking (HA NAT in prod) ───────────────────────────────────────────────
 module "network" {
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/network?ref=network-v1.0.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/network?ref=network-v1.1.2"
 
   name                 = local.name
   region               = local.region

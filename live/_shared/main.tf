@@ -55,7 +55,7 @@ module "ecr" {
 
 # ── GitHub OIDC deploy roles (deploy per-env, ecr-push, infra plan/apply) ─────
 module "iam_oidc" {
-  source            = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v1.0.0"
+  source            = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v1.1.0"
   product           = "__PRODUCT__"
   github_org        = var.github_org
   oidc_provider_arn = data.terraform_remote_state.platform.outputs.oidc_provider_arn
