@@ -18,17 +18,33 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Replace placeholder in every tracked text file (skip .git and this script).
-grep -rl '__PRODUCT__' "$ROOT" \
+# ── Reserve a VPC /16 (second octet) ─────────────────────────────────────────
+# The registry lives in the qnsc-infra repo (allocations.json). Pass the octet
+# explicitly: NET=<n> ./scripts/init.sh <product>. Without it we stop rather
+# than guess a colliding CIDR.
+NET="${NET:-}"
+if [[ -z "$NET" ]]; then
+  echo "!! No VPC octet reserved. Pick the lowest free 'net' in 10-89 from" >&2
+  echo "   qnsc-infra/allocations.json, add <product>-develop + <product>-prod" >&2
+  echo "   entries there, then re-run:  NET=<n> $0 ${PRODUCT}" >&2
+  exit 1
+fi
+if [[ ! "$NET" =~ ^[0-9]+$ ]] || (( NET < 10 || NET > 89 )); then
+  echo "NET must be an integer in 10-89 (see allocations.json reserved_bands)." >&2
+  exit 1
+fi
+
+# Replace placeholders in every tracked text file (skip .git and this script).
+grep -rlE '__PRODUCT__|__NET__' "$ROOT" \
   --exclude-dir=.git \
   --exclude="init.sh" \
   | while read -r f; do
-      sed -i.bak "s/__PRODUCT__/${PRODUCT}/g" "$f" && rm -f "$f.bak"
+      sed -i.bak -e "s/__PRODUCT__/${PRODUCT}/g" -e "s/__NET__/${NET}/g" "$f" && rm -f "$f.bak"
       echo "  updated $f"
     done
 
 echo
-echo "✓ Initialized infra for product '${PRODUCT}'."
+echo "✓ Initialized infra for product '${PRODUCT}' (VPC 10.${NET}.0.0/16)."
 echo
 echo "Next steps:"
 echo "  1. Review live/_shared/main.tf — adjust ECR repo names, drop web-deploy block if no SPA."

@@ -50,10 +50,13 @@ module "network" {
   name                 = local.name
   region               = local.region
   azs                  = local.azs
-  vpc_cidr             = "10.41.0.0/16"
-  public_subnet_cidrs  = ["10.41.0.0/24", "10.41.1.0/24", "10.41.2.0/24"]
-  private_subnet_cidrs = ["10.41.10.0/24", "10.41.11.0/24", "10.41.12.0/24"]
-  data_subnet_cidrs    = ["10.41.20.0/24", "10.41.21.0/24", "10.41.22.0/24"]
+  # __NET__ = the second octet reserved for this product-env in
+  # qnsc-infra/allocations.json. init.sh replaces it; never hardcode a value
+  # that collides with an existing allocation.
+  vpc_cidr             = "10.__NET__.0.0/16"
+  public_subnet_cidrs  = ["10.__NET__.0.0/24", "10.__NET__.1.0/24", "10.__NET__.2.0/24"]
+  private_subnet_cidrs = ["10.__NET__.10.0/24", "10.__NET__.11.0/24", "10.__NET__.12.0/24"]
+  data_subnet_cidrs    = ["10.__NET__.20.0/24", "10.__NET__.21.0/24", "10.__NET__.22.0/24"]
   multi_az_nat         = true # HA NAT in production
   enable_flow_logs     = true
   tags                 = { Environment = local.env }
