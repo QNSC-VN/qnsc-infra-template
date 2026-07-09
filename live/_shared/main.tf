@@ -24,12 +24,6 @@ provider "aws" {
   }
 }
 
-variable "github_org" {
-  type        = string
-  default     = "QNSC-VN"
-  description = "GitHub org/owner that hosts the __PRODUCT__ repositories."
-}
-
 # ── Platform remote state (OIDC provider ARN, KMS, artifacts bucket) ──────────
 # Provided by qnsc-infra/live/bootstrap (the account-level singletons).
 data "terraform_remote_state" "platform" {
