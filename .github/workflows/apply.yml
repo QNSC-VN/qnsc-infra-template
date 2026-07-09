@@ -22,6 +22,10 @@ env:
 
 jobs:
   apply-shared:
+    # The template repo keeps the unresolved `__PRODUCT__` placeholder role ARN,
+    # so OIDC role assumption can never succeed here. Scaffolded copies have a
+    # different repository name and run normally.
+    if: github.repository != 'QNSC-VN/qnsc-infra-template'
     runs-on: ubuntu-latest
     environment: shared
     timeout-minutes: 60
@@ -49,6 +53,7 @@ jobs:
 
   apply-develop:
     needs: apply-shared
+    if: github.repository != 'QNSC-VN/qnsc-infra-template'
     runs-on: ubuntu-latest
     environment: develop
     timeout-minutes: 45
@@ -80,6 +85,7 @@ jobs:
 
   apply-prod:
     needs: apply-develop
+    if: github.repository != 'QNSC-VN/qnsc-infra-template'
     runs-on: ubuntu-latest
     environment: production   # requires manual approval in GitHub Settings
     timeout-minutes: 45
