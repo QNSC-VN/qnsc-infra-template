@@ -28,3 +28,17 @@ output "artifacts_bucket_name" {
   value       = data.terraform_remote_state.platform.outputs.artifacts_bucket_name
   description = "Shared artifacts bucket from qnsc-infra."
 }
+
+# Cloudflare singletons — one source of truth in qnsc-infra bootstrap, re-exported
+# so env stacks read the zone ID / IP ranges from _shared (like kms_key_arn),
+# never as a per-stack input. try(...) keeps this stack applying before qnsc-infra
+# publishes the Cloudflare outputs.
+output "cloudflare_zone_id" {
+  value       = try(data.terraform_remote_state.platform.outputs.cloudflare_zone_id, "")
+  description = "qnsc.vn Cloudflare zone ID from qnsc-infra (empty until published)."
+}
+
+output "cloudflare_ipv4" {
+  value       = try(data.terraform_remote_state.platform.outputs.cloudflare_ipv4, [])
+  description = "Cloudflare IPv4 CIDR ranges from qnsc-infra (empty until published)."
+}

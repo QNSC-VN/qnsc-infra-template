@@ -18,37 +18,36 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# ── Reserve a VPC /16 (second octet) ─────────────────────────────────────────
-# The registry lives in the qnsc-infra repo (allocations.json). Pass the octet
-# explicitly: NET=<n> ./scripts/init.sh <product>. Without it we stop rather
-# than guess a colliding CIDR.
+# ── No VPC reservation (Option A) ────────────────────────────────────────────
+# Products no longer reserve a VPC /16 — AWS full-stack consumes the shared
+# runtime VPC from qnsc-infra (platform/runtime-dev + runtime-prod) via remote
+# state; Cloudflare-native has no VPC. NET is accepted for back-compat but ignored.
 NET="${NET:-}"
-if [[ -z "$NET" ]]; then
-  echo "!! No VPC octet reserved. Pick the lowest free 'net' in 10-89 from" >&2
-  echo "   qnsc-infra/allocations.json, add <product>-develop + <product>-prod" >&2
-  echo "   entries there, then re-run:  NET=<n> $0 ${PRODUCT}" >&2
-  exit 1
-fi
-if [[ ! "$NET" =~ ^[0-9]+$ ]] || (( NET < 10 || NET > 89 )); then
-  echo "NET must be an integer in 10-89 (see allocations.json reserved_bands)." >&2
-  exit 1
+if [[ -n "$NET" ]]; then
+  echo "note: NET is obsolete under Option A — products consume the shared runtime" >&2
+  echo "      VPC from qnsc-infra; ignoring NET." >&2
 fi
 
 # Replace placeholders in every tracked text file (skip .git and this script).
-grep -rlE '__PRODUCT__|__NET__' "$ROOT" \
+grep -rlE '__PRODUCT__' "$ROOT" \
   --exclude-dir=.git \
   --exclude="init.sh" \
   | while read -r f; do
-      sed -i.bak -e "s/__PRODUCT__/${PRODUCT}/g" -e "s/__NET__/${NET}/g" "$f" && rm -f "$f.bak"
+      sed -i.bak -e "s/__PRODUCT__/${PRODUCT}/g" "$f" && rm -f "$f.bak"
       echo "  updated $f"
     done
 
 echo
-echo "✓ Initialized infra for product '${PRODUCT}' (VPC 10.${NET}.0.0/16)."
+echo "✓ Initialized infra for product '${PRODUCT}'."
 echo
-echo "Next steps:"
-echo "  1. Review live/_shared/main.tf — adjust ECR repo names, drop web-deploy block if no SPA."
-echo "  2. Fill in live/develop and live/prod with the modules this product needs."
-echo "  3. Set GitHub secrets: AWS_ACCOUNT_ID, ACM_CERT_ARN_DEVELOP, ACM_CERT_ARN_PROD, etc."
-echo "  4. Create the '${PRODUCT}-github-infra-apply' IAM role (see README)."
-echo "  5. Delete this script and scripts/ once done."
+echo "Pick ONE archetype and delete the other:"
+echo "  • AWS full-stack     → keep live/ (shared runtime; per-product RDS + Fargate); delete cloudflare-native/"
+echo "  • Cloudflare-native  → keep cloudflare-native/ (Pages + Functions); delete live/"
+echo
+echo "Next steps (AWS full-stack):"
+echo "  1. Prereq: shared runtime stacks must exist in qnsc-infra (platform/runtime-dev, platform/runtime-prod)."
+echo "  2. Review live/_shared/main.tf — adjust ECR repo names, drop the web block if no SPA."
+echo "  3. Fill live/develop and live/prod with the modules this product needs."
+echo "  4. Set GitHub secrets: AWS_ACCOUNT_ID, etc. (see README)."
+echo "  5. Create the '${PRODUCT}-github-infra-apply' IAM role (see README)."
+echo "  6. Delete scripts/ once done."
