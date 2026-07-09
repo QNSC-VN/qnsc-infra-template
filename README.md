@@ -9,6 +9,26 @@ other product.
 
 ---
 
+## Choose your archetype
+
+Two shapes ship in this template. Pick one; delete the other.
+
+| Archetype | Use when | Where | Provisions |
+| :-------- | :------- | :---- | :--------- |
+| **AWS full-stack** | Postgres + background workers (SQS/SNS), private VPC, container services. | [`live/`](./live/) | Per-product **RDS + Fargate** (api/worker/migrator). Shares the **VPC / NAT / ALB / WAF** from `qnsc-infra`'s `runtime-dev` / `runtime-prod` (Option A) via remote state — it does **not** create its own network. |
+| **Cloudflare-native** | Static site or thin API-on-the-edge, D1/KV/R2 instead of RDS. No long-running containers. | [`cloudflare-native/`](./cloudflare-native/) | A **Cloudflare Pages** project + **Pages Functions**. Zero egress, no OpenTofu, no AWS. |
+
+> **AWS full-stack prerequisite (Option A):** the shared runtime layer must exist
+> first — `qnsc-infra/live/runtime-dev` (key `platform/runtime-dev/...`) and
+> `runtime-prod` (key `platform/runtime-prod/...`). The env stacks read the
+> VPC/subnets/ALB/SGs from those via `terraform_remote_state "runtime"`. See
+> [`live/README`](./live/) below.
+
+The rest of this README covers the **AWS full-stack** archetype. For
+Cloudflare-native, see [`cloudflare-native/README.md`](./cloudflare-native/README.md).
+
+---
+
 ## The QNSC platform model (read this first)
 
 "Shared infra" does **not** mean every product runs the same infrastructure. It
@@ -55,32 +75,37 @@ After init you have:
 ```
 live/
   _shared/   ECR repos + GitHub OIDC deploy roles (api/worker + web). Run once.
-  develop/   Develop environment stack (starter: attaches to qnsc-infra's
-             shared platform-dev VPC/RDS/cache — does NOT provision its own
-             network. See live/develop/main.tf for the remote-state wiring).
-  prod/      Production stack (own VPC, HA NAT, prod-sized — fully isolated
-             per product, unlike develop).
+  develop/   Develop environment stack. Provisions this product's own RDS +
+             Fargate (api/worker/migrator); consumes the shared VPC/NAT/ALB
+             from qnsc-infra runtime-dev via remote state (does NOT create its
+             own network). See live/develop/main.tf for the wiring.
+  prod/      Production stack. Same shape as develop (per-product RDS + Fargate,
+             shared VPC/NAT/ALB from runtime-prod) plus a prod_tier switch
+             (lean | ha) for RDS Multi-AZ, per-product cache, and task counts.
 .github/workflows/
   plan.yml   tofu plan on PRs (per changed env), posts comment.
   apply.yml  tofu apply on merge: _shared → develop → prod (prod gated).
 ```
 
 Then **compose the modules this product needs** in `live/develop` and
-`live/prod`. See `rally-infra` / `opshub-infra` for full worked examples
-(note: as of this template update, rally/opshub still provision their own
-develop-tier network — they predate the platform-dev migration. Use this
-template's `live/develop/main.tf` as the source of truth for the intended
-shape, not those repos, until they're migrated).
+`live/prod`. See `rally-infra` / `opshub-infra` for full worked examples — they
+follow the same Option A shape (shared runtime layer + per-product RDS/Fargate).
 
 ---
 
 ## Prerequisites for a new product
 
-1. **`qnsc-infra` bootstrap AND `platform-dev` applied** — the platform
-   singletons and the shared develop-tier VPC/RDS/cache must exist first.
-2. **GitHub secrets** on the new repo: `AWS_ACCOUNT_ID`,
-   `ACM_CERT_ARN_DEVELOP`, `WEB_ACM_CERT_ARN_DEVELOP`, `ACM_CERT_ARN_PROD`,
-   `WEB_ACM_CERT_ARN_PROD`.
+1. **`qnsc-infra` bootstrap AND the shared runtime layer applied** — the
+   platform singletons (`bootstrap`) plus `runtime-dev` and `runtime-prod`
+   (shared VPC / NAT / ALB / WAF) must exist first. The env stacks read them
+   via `terraform_remote_state "runtime"`.
+2. **GitHub secrets** on the new repo: `AWS_ACCOUNT_ID`, plus the Cloudflare
+   wiring for the web SPA + API DNS — `CLOUDFLARE_ACCOUNT_ID` (→
+   `TF_VAR_cloudflare_account_id`) and `CLOUDFLARE_API_TOKEN` (→
+   `TF_VAR_cloudflare_api_token`, Zone:DNS:Edit on `qnsc.vn`). The Cloudflare
+   zone ID and IP ranges are read from `qnsc-infra` bootstrap via `_shared`
+   remote state — not repo secrets. (`ACM_CERT_ARN_*` is vestigial: the ALB now
+   lives in the shared runtime layer; the var is kept for CI compatibility.)
 3. **GitHub Environments** `shared`, `develop`, `production` (add required
    reviewers on `production` for the apply gate).
 4. **Infra OIDC role** `<product>-github-infra-apply` — created once (broad

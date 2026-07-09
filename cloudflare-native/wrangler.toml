@@ -1,0 +1,28 @@
+name = "__PRODUCT__"
+compatibility_date = "2026-07-01"
+
+# Static build output served by Cloudflare Pages. Point this at your framework's
+# build dir (Astro/Vite → "dist", Next static export → "out", plain → "public").
+pages_build_output_dir = "dist"
+
+# ── Pages Functions ───────────────────────────────────────────────────────────
+# Files under ./functions become edge routes automatically:
+#   functions/api/hello.ts  →  GET /api/hello
+# No config needed here — this file only declares the project + bindings.
+
+# ── D1 (SQLite at the edge) — uncomment when you need a database ───────────────
+# Create it first:  wrangler d1 create __PRODUCT__
+# then paste the printed database_id below.
+# [[d1_databases]]
+# binding       = "DB"        # available in Functions as env.DB
+# database_name = "__PRODUCT__"
+# database_id   = ""          # <- from `wrangler d1 create`
+
+# ── KV / R2 examples (uncomment as needed) ────────────────────────────────────
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id      = ""
+#
+# [[r2_buckets]]
+# binding     = "ASSETS"
+# bucket_name = "__PRODUCT__-assets"

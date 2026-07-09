@@ -46,11 +46,11 @@ data "aws_caller_identity" "current" {}
 # ── Container registries ──────────────────────────────────────────────────────
 # Add/remove repos to match what this product builds.
 module "ecr" {
-  source           = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecr?ref=ecr-v1.0.0"
-  repository_names  = ["__PRODUCT__-api", "__PRODUCT__-worker"]
+  source               = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecr?ref=ecr-v1.0.0"
+  repository_names     = ["__PRODUCT__-api", "__PRODUCT__-worker"]
   image_tag_mutability = "MUTABLE"
-  kms_key_arn       = data.terraform_remote_state.platform.outputs.kms_key_arn
-  tags              = { Scope = "shared" }
+  kms_key_arn          = data.terraform_remote_state.platform.outputs.kms_key_arn
+  tags                 = { Scope = "shared" }
 }
 
 # ── GitHub OIDC deploy roles (deploy per-env, ecr-push, infra plan/apply) ─────
