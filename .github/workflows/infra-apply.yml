@@ -1,8 +1,8 @@
 # =============================================================================
-# OpenTofu Apply — applies after merge to main.
+# Infrastructure · Apply — applies after merge to main. (OpenTofu under the hood.)
 # Shared → develop → prod (prod requires GitHub Environment approval).
 # =============================================================================
-name: OpenTofu Apply
+name: Infrastructure · Apply
 
 on:
   push:
@@ -10,11 +10,17 @@ on:
     paths:
       - "live/**"
       - "modules/**"
-      - ".github/workflows/apply.yml"
+      - ".github/workflows/infra-apply.yml"
 
 permissions:
   id-token: write
   contents: read
+
+# Serialize applies on the same ref so two quick merges can't race the tofu
+# state lock. Never cancel a running apply mid-flight.
+concurrency:
+  group: infra-apply-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   TOFU_VERSION: "1.9.1"
