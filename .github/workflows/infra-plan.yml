@@ -1,8 +1,8 @@
 # =============================================================================
-# OpenTofu Plan — dry-run on every PR targeting main.
+# Infrastructure · Plan — dry-run on every PR targeting main. (OpenTofu under the hood.)
 # Posts a plan comment per changed workspace directly on the PR.
 # =============================================================================
-name: OpenTofu Plan
+name: Infrastructure · Plan
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
     paths:
       - "live/**"
       - "modules/**"
-      - ".github/workflows/plan.yml"
+      - ".github/workflows/infra-plan.yml"
 
 permissions:
   id-token: write
@@ -22,6 +22,22 @@ env:
   AWS_REGION: ap-southeast-1
 
 jobs:
+  fmt:
+    name: tofu fmt check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0   # v7.0.0
+
+      - uses: QNSC-VN/qnsc-ci/actions/setup-tofu-aws@v1
+        with:
+          role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/__PRODUCT__-github-infra-plan
+          aws-region: ${{ env.AWS_REGION }}
+          tofu-version: ${{ env.TOFU_VERSION }}
+
+      - name: tofu fmt -check
+        run: tofu fmt -check -recursive -diff
+
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -93,7 +109,7 @@ jobs:
             const truncated = plan.length > 60000
               ? plan.substring(0, 60000) + '\n\n... (truncated)'
               : plan;
-            const body = `### OpenTofu Plan — \`${workspace}\`\n\`\`\`hcl\n${truncated}\n\`\`\``;
+            const body = `### Infrastructure Plan — \`${workspace}\`\n\`\`\`hcl\n${truncated}\n\`\`\``;
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
