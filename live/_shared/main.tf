@@ -49,7 +49,7 @@ module "ecr" {
 
 # ── GitHub OIDC deploy roles (deploy per-env, ecr-push, infra plan/apply) ─────
 module "iam_oidc" {
-  source            = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v1.1.0"
+  source            = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/iam-oidc?ref=iam-oidc-v2.0.1"
   product           = "__PRODUCT__"
   github_org        = var.github_org
   oidc_provider_arn = data.terraform_remote_state.platform.outputs.oidc_provider_arn
@@ -74,72 +74,22 @@ module "iam_oidc" {
   ecr_repository_pattern = "__PRODUCT__-*"
   ecs_passrole_pattern   = "__PRODUCT__-*"
   tags                   = { Scope = "shared" }
-}
 
-# ── GitHub OIDC deploy roles for the web SPA (S3 + CloudFront) ─────────────────
-# Remove this whole block if the product has no web frontend.
-locals {
-  web_deploy_envs = {
-    develop = {
-      allowed_subjects = ["repo:${var.github_org}/__PRODUCT__-web:ref:refs/heads/main"]
-      s3_bucket        = "__PRODUCT__-web-develop"
-    }
-    production = {
-      allowed_subjects = [
-        "repo:${var.github_org}/__PRODUCT__-web:ref:refs/heads/main",
-        "repo:${var.github_org}/__PRODUCT__-web:ref:refs/tags/v*",
-      ]
-      s3_bucket = "__PRODUCT__-web-prod"
-    }
+  # Blast-radius guardrail: explicit-Deny on this product's infra-apply role so a
+  # buggy product apply cannot destroy the platform's own foundations (state bucket,
+  # lock table, OIDC provider, CMK) or mint IAM users — all owned by qnsc-infra
+  # bootstrap, never by a product. (The platform stack itself omits this.)
+  infra_apply_guardrail = {
+    state_bucket_arn     = "arn:aws:s3:::qnsc-tofu-state"
+    lock_table_arn       = "arn:aws:dynamodb:ap-southeast-1:${data.aws_caller_identity.current.account_id}:table/qnsc-tofu-locks"
+    oidc_provider_arn    = data.terraform_remote_state.platform.outputs.oidc_provider_arn
+    kms_key_arn          = data.terraform_remote_state.platform.outputs.kms_key_arn
+    artifacts_bucket_arn = data.terraform_remote_state.platform.outputs.artifacts_bucket_arn
   }
 }
 
-resource "aws_iam_role" "web_deploy" {
-  for_each = local.web_deploy_envs
-
-  name        = "__PRODUCT__-github-web-deploy-${each.key}"
-  description = "Assumed by GitHub Actions to deploy __PRODUCT__-web to ${each.key}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Federated = data.terraform_remote_state.platform.outputs.oidc_provider_arn }
-      Action    = "sts:AssumeRoleWithWebIdentity"
-      Condition = {
-        StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
-        StringLike   = { "token.actions.githubusercontent.com:sub" = each.value.allowed_subjects }
-      }
-    }]
-  })
-
-  tags = { Scope = "shared", Environment = each.key }
-}
-
-resource "aws_iam_role_policy" "web_deploy" {
-  for_each = local.web_deploy_envs
-
-  name = "__PRODUCT__-web-deploy-${each.key}"
-  role = aws_iam_role.web_deploy[each.key].id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "S3Sync"
-        Effect = "Allow"
-        Action = ["s3:PutObject", "s3:DeleteObject", "s3:GetObject", "s3:ListBucket"]
-        Resource = [
-          "arn:aws:s3:::${each.value.s3_bucket}",
-          "arn:aws:s3:::${each.value.s3_bucket}/*",
-        ]
-      },
-      {
-        Sid      = "CloudFrontInvalidate"
-        Effect   = "Allow"
-        Action   = ["cloudfront:CreateInvalidation"]
-        Resource = "arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/*"
-      },
-    ]
-  })
-}
+# ── Web SPA deploy ────────────────────────────────────────────
+# The web SPA deploys to Cloudflare Pages (wrangler pages deploy) using a Cloudflare
+# API token, so it needs no AWS deploy role. If a product ever hosts its web build on
+# S3+CloudFront instead, add a dedicated deploy role here — but the standard is
+# Cloudflare Pages (see rally / opshub web-deploy.yml).

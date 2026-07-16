@@ -13,11 +13,6 @@ output "infra_apply_role_arn" {
   description = "OIDC role assumed by the infra apply pipeline."
 }
 
-output "web_deploy_role_arns" {
-  value       = { for k, v in aws_iam_role.web_deploy : k => v.arn }
-  description = "OIDC roles assumed by CI to deploy the web SPA, per env."
-}
-
 # ── Re-exported platform singletons (env stacks read these, not qnsc-infra) ───
 output "kms_key_arn" {
   value       = data.terraform_remote_state.platform.outputs.kms_key_arn
