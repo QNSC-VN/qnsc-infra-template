@@ -92,7 +92,7 @@ data "terraform_remote_state" "runtime" {
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 module "secrets" {
-  source               = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/secrets?ref=secrets-v1.0.0"
+  source               = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/secrets?ref=secrets-v1.1.0"
   prefix               = "__PRODUCT__/${local.env}"
   kms_key_arn          = local.kms_key_arn
   recovery_window_days = 30 # longer recovery in production
@@ -293,7 +293,7 @@ module "worker" {
 # cleanly before the public hostname is chosen.
 module "web" {
   count  = var.cloudflare_account_id != "" && var.web_domain != "" ? 1 : 0
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/pages-web?ref=pages-web-v1.0.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/pages-web?ref=pages-web-v1.0.1"
 
   account_id  = var.cloudflare_account_id
   name        = "__PRODUCT__-prod-web"
