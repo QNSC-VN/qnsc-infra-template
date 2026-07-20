@@ -65,22 +65,24 @@ locals {
   # (read via _shared remote state), so a CF range change is one edit there.
   cloudflare_ipv4 = data.terraform_remote_state.shared.outputs.cloudflare_ipv4
 
-  # prod_tier switch (Option A): lean = shared runtime-prod cache + single-AZ
-  # DB + 1 task/svc; ha = per-product cache + multi-AZ DB + 2 tasks/svc.
+  # prod_tier switch (Option A): lean = single-AZ DB + 1 task/svc; ha = multi-AZ
+  # DB + 2 tasks/svc. Cache is always a dedicated per-product node (below),
+  # independent of tier.
   is_ha = var.prod_tier == "ha"
 
-  # Cache endpoint: lean uses the shared runtime-prod node (via remote state);
-  # ha uses this product's own cache node (module.cache below). REDIS_URL is an
-  # env var (not a secret) — the endpoint isn't sensitive.
-  cache_endpoint = coalesce(one(module.cache[*].endpoint), data.terraform_remote_state.runtime.outputs.cache_endpoint)
-  cache_port     = coalesce(one(module.cache[*].port), data.terraform_remote_state.runtime.outputs.cache_port)
-  redis_url      = "redis://${local.cache_endpoint}:${local.cache_port}"
+  # Cache endpoint: this product's own dedicated Valkey node (module.cache below).
+  # The cache module enables in-transit encryption, so the client connects over
+  # TLS (rediss://). REDIS_URL is an env var (not a secret) — the endpoint isn't
+  # sensitive.
+  cache_endpoint = module.cache.endpoint
+  cache_port     = module.cache.port
+  redis_url      = "rediss://${local.cache_endpoint}:${local.cache_port}"
 }
 
-# ── Shared runtime layer (VPC + NAT + ALB + prod cache + WAF) ─────────────────
-# Option A: the prod VPC/NAT/ALB/WAF (and, in lean tier, a shared cache node)
-# live once per env in qnsc-infra/live/runtime-prod and are consumed here via
-# remote state. RDS + Fargate stay per-product below.
+# ── Shared runtime layer (VPC + NAT + ALB + WAF) ──────────────────────────────
+# Option A: the prod VPC/NAT/ALB/WAF live once per env in
+# qnsc-infra/live/runtime-prod and are consumed here via remote state. RDS +
+# cache + Fargate stay per-product below.
 data "terraform_remote_state" "runtime" {
   backend = "s3"
   config = {
@@ -127,18 +129,20 @@ module "rds" {
   tags = { Environment = local.env }
 }
 
-# ── ElastiCache Valkey ────────────────────────────────────────────────────────
-# Per-product cache in the HA tier only. In lean, both products share the single
-# runtime-prod cache node (key-prefixed) — see local.cache_endpoint.
+# ── Cache (dedicated per-product Valkey node) ────────────────────────────────
+# Each product owns its own single-node ElastiCache Valkey so one product's load
+# or a node restart can't evict another product's BFF sessions. In-transit +
+# at-rest encryption on (SOC 2); reuses the shared runtime-prod cache SG + data
+# subnets. Endpoint feeds local.redis_url (rediss://) above.
 module "cache" {
-  count  = local.is_ha ? 1 : 0
   source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/cache?ref=cache-v1.0.0"
 
-  name              = local.name
+  name              = "${local.name}-cache"
   subnet_ids        = data.terraform_remote_state.runtime.outputs.data_subnet_ids
   security_group_id = data.terraform_remote_state.runtime.outputs.sg_cache_id
+  kms_key_arn       = local.kms_key_arn
 
-  mode      = "node"
+  mode      = "node" # single cache.t4g.micro (~$12/mo) — cheaper than serverless ~$90 floor
   node_type = "cache.t4g.micro"
 
   tags = { Environment = local.env }
