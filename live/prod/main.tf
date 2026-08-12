@@ -94,7 +94,7 @@ data "terraform_remote_state" "runtime" {
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 module "secrets" {
-  source               = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/secrets?ref=secrets-v1.1.0"
+  source               = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/secrets?ref=secrets-v2.1.1"
   prefix               = "__PRODUCT__/${local.env}"
   kms_key_arn          = local.kms_key_arn
   recovery_window_days = 30 # longer recovery in production
@@ -111,7 +111,7 @@ module "secrets" {
 
 # ── RDS PostgreSQL 17 (Multi-AZ in ha tier) ──────────────────────────────────
 module "rds" {
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/rds?ref=rds-v1.1.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/rds?ref=rds-v2.0.0"
 
   identifier        = local.name
   subnet_ids        = data.terraform_remote_state.runtime.outputs.data_subnet_ids
@@ -180,14 +180,30 @@ module "messaging" {
 
 # ── ECS Cluster ───────────────────────────────────────────────────────────────
 module "ecs_cluster" {
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-cluster?ref=ecs-cluster-v1.0.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-cluster?ref=ecs-cluster-v2.0.0"
   name   = local.name
-  tags   = { Environment = local.env }
+
+  # STATED, never inherited. "enhanced" adds per-task and per-container metrics that
+  # CloudWatch bills as CUSTOM metrics at $0.07 each — four clusters silently on that
+  # default produced 606 metric-months (~$42) on the July 2026 bill, and the count grows
+  # with task churn rather than with traffic.
+  #
+  # This template did not state it at all, so every product created from it inherited the
+  # module default — which was "enhanced" until ecs-cluster v2.0.0 changed it to "enabled".
+  # A new product should not have to discover that on a bill.
+  #
+  # "disabled" matches rally, qnsc-kb-backend and opshub, all of which audited their
+  # consumers and found none: their alarms and dashboards read AWS/ECS, AWS/ApplicationELB
+  # and AWS/RDS, which are free and published regardless. Raise to "enhanced" temporarily
+  # while debugging a per-container resource problem, then put it back.
+  container_insights = "disabled"
+
+  tags = { Environment = local.env }
 }
 
 # ── ECS Service — API ─────────────────────────────────────────────────────────
 module "api" {
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-service?ref=ecs-service-v1.3.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-service?ref=ecs-service-v2.1.1"
 
   service_name = "api"
   cluster_name = module.ecs_cluster.cluster_name
@@ -244,7 +260,7 @@ module "api" {
 
 # ── ECS Service — Worker ──────────────────────────────────────────────────────
 module "worker" {
-  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-service?ref=ecs-service-v1.3.0"
+  source = "git::https://github.com/QNSC-VN/qnsc-tf-modules.git//modules/ecs-service?ref=ecs-service-v2.1.1"
 
   service_name = "worker"
   cluster_name = module.ecs_cluster.cluster_name

@@ -24,12 +24,18 @@ env:
 jobs:
   fmt:
     name: tofu fmt check
+    # The template repo keeps the unresolved `__PRODUCT__` placeholder role ARN, so OIDC
+    # role assumption can never succeed here — infra-apply.yml already guards every job
+    # this way and this one was missed, so the check has been failing on every PR that
+    # touches a .tf file. Scaffolded copies have a different repository name and run
+    # normally.
+    if: github.repository != 'QNSC-VN/qnsc-infra-template'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0   # v7.0.0
 
-      - uses: QNSC-VN/qnsc-ci/actions/setup-tofu-aws@v1.4.0
+      - uses: QNSC-VN/qnsc-ci/actions/setup-tofu-aws@v1.9.0
         with:
           role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/__PRODUCT__-github-infra-plan
           aws-region: ${{ env.AWS_REGION }}
@@ -63,6 +69,12 @@ jobs:
           echo "workspaces=$CHANGED" >> $GITHUB_OUTPUT
 
   plan:
+    # The template repo keeps the unresolved `__PRODUCT__` placeholder role ARN, so OIDC
+    # role assumption can never succeed here — infra-apply.yml already guards every job
+    # this way and this one was missed, so the check has been failing on every PR that
+    # touches a .tf file. Scaffolded copies have a different repository name and run
+    # normally.
+    if: github.repository != 'QNSC-VN/qnsc-infra-template'
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.workspaces != '[]' }}
     runs-on: ubuntu-latest
@@ -75,7 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0   # v7.0.0
 
-      - uses: QNSC-VN/qnsc-ci/actions/setup-tofu-aws@v1.4.0
+      - uses: QNSC-VN/qnsc-ci/actions/setup-tofu-aws@v1.9.0
         with:
           role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/__PRODUCT__-github-infra-plan
           aws-region: ${{ env.AWS_REGION }}
